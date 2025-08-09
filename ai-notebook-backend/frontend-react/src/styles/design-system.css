@@ -1,0 +1,131 @@
+/* Design System - CSS Variables and Base Styles */
+:root {
+  /* Color System */
+  --color-primary: 199 89% 70%;
+  --color-primary-foreground: 210 40% 3%;
+  --color-secondary: 215 20% 25%;
+  --color-secondary-foreground: 210 40% 96%;
+  --color-accent: 217 32% 17%;
+  --color-accent-foreground: 210 40% 96%;
+  --color-background: #0b1220;
+  --color-foreground: 210 40% 96%;
+  --color-card: 215 20% 8%;
+  --color-card-foreground: 210 40% 96%;
+  --color-border: 215 20% 22%;
+  --color-input: 215 20% 15%;
+  --color-ring: 199 89% 70%;
+  --color-muted: 215 20% 15%;
+  --color-muted-foreground: 215 15% 65%;
+  --color-destructive: 0 84% 60%;
+  --color-destructive-foreground: 210 40% 96%;
+  --color-success: 142 76% 36%;
+  --color-success-foreground: 210 40% 96%;
+  --color-warning: 38 92% 50%;
+  --color-warning-foreground: 210 40% 3%;
+
+  /* Spacing */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* Border Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+
+  /* Typography */
+  --font-family-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-glass: 0 10px 30px rgba(2, 6, 23, 0.28);
+
+  /* Glassmorphism */
+  --glass-backdrop: rgba(15, 23, 42, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Styles */
+* {
+  border-color: hsl(var(--color-border));
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--color-background);
+  color: hsl(var(--color-foreground));
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility Classes */
+.glass {
+  background: var(--glass-backdrop);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(var(--color-primary)) 0%, hsl(220 70% 60%) 100%);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--color-primary)) 0%, hsl(220 70% 60%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.shadow-glass {
+  box-shadow: var(--shadow-glass);
+}
+
+/* Focus styles */
+.focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--color-ring));
+  outline-offset: 2px;
+}

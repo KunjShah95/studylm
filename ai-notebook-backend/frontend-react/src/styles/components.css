@@ -1,0 +1,199 @@
+/* Component Styles */
+
+/* Button Components */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:opacity-50 disabled:pointer-events-none;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+}
+
+.btn-primary {
+  @apply bg-sky-400 text-black hover:bg-sky-300 active:scale-95 shadow-lg hover:shadow-xl;
+}
+
+.btn-secondary {
+  @apply glass hover:bg-white/10 text-white active:scale-95;
+}
+
+.btn-outline {
+  @apply border border-white/20 bg-transparent hover:bg-white/5 text-white active:scale-95;
+}
+
+.btn-ghost {
+  @apply bg-transparent hover:bg-white/5 text-white active:scale-95;
+}
+
+.btn-destructive {
+  @apply bg-red-600 text-white hover:bg-red-500 active:scale-95 shadow-lg hover:shadow-xl;
+}
+
+/* Card Components */
+.card {
+  @apply glass rounded-2xl p-6 shadow-glass;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glass), 0 20px 40px rgba(2, 6, 23, 0.4);
+}
+
+.card-header {
+  @apply flex flex-col space-y-1.5 p-6;
+}
+
+.card-title {
+  @apply text-2xl font-semibold leading-none tracking-tight;
+}
+
+.card-description {
+  @apply text-sm text-slate-400;
+}
+
+.card-content {
+  @apply p-6 pt-0;
+}
+
+.card-footer {
+  @apply flex items-center p-6 pt-0;
+}
+
+/* Input Components */
+.input {
+  @apply flex h-10 w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm backdrop-blur-sm;
+  @apply file:border-0 file:bg-transparent file:text-sm file:font-medium;
+  @apply placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400;
+  @apply disabled:cursor-not-allowed disabled:opacity-50;
+  transition: all var(--transition-fast);
+}
+
+.input:focus {
+  @apply bg-white/10 border-sky-400/50;
+}
+
+/* Modal Components */
+.modal-overlay {
+  @apply fixed inset-0 z-50 bg-black/80 backdrop-blur-sm;
+}
+
+.modal-content {
+  @apply fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4;
+  @apply glass rounded-2xl p-6 shadow-2xl;
+}
+
+.modal-header {
+  @apply flex flex-col space-y-1.5 text-center sm:text-left;
+}
+
+.modal-title {
+  @apply text-lg font-semibold;
+}
+
+.modal-description {
+  @apply text-sm text-slate-400;
+}
+
+.modal-footer {
+  @apply flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2;
+}
+
+/* Badge Components */
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  @apply transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400;
+}
+
+.badge-default {
+  @apply glass text-white hover:bg-white/20;
+}
+
+.badge-secondary {
+  @apply bg-slate-700 text-slate-200 hover:bg-slate-600;
+}
+
+.badge-destructive {
+  @apply bg-red-600 text-white hover:bg-red-500;
+}
+
+.badge-outline {
+  @apply border border-white/20 text-white hover:bg-white/5;
+}
+
+/* Loading Spinner */
+.spinner {
+  @apply inline-block animate-spin rounded-full border-4 border-solid border-current border-r-transparent;
+  border-top-color: transparent;
+}
+
+.spinner-sm {
+  @apply h-4 w-4;
+}
+
+.spinner-md {
+  @apply h-6 w-6;
+}
+
+.spinner-lg {
+  @apply h-8 w-8;
+}
+
+/* Layout Components */
+.layout-grid {
+  @apply grid grid-cols-[minmax(220px,300px)_1fr] gap-6 max-w-[98vw] mx-auto my-3 px-5;
+  min-height: calc(100vh - 64px - 1.5rem);
+}
+
+.sidebar {
+  @apply flex flex-col space-y-2 p-4;
+}
+
+.sidebar-item {
+  @apply flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium;
+  @apply transition-colors hover:bg-white/5 focus:bg-white/10 focus:outline-none;
+}
+
+.sidebar-item.active {
+  @apply bg-white/10 text-sky-400;
+}
+
+/* Navigation */
+.nav {
+  @apply sticky top-0 z-50 flex items-center justify-between min-h-16 px-4 py-3;
+  @apply glass border-b border-white/20;
+}
+
+.nav-brand {
+  @apply flex items-center gap-3;
+}
+
+.nav-logo {
+  @apply w-7 h-7 rounded-xl border border-white/20;
+  background: linear-gradient(145deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+}
+
+.nav-links {
+  @apply flex items-center gap-2;
+}
+
+.nav-link {
+  @apply text-slate-400 px-2 py-1 rounded-lg hover:bg-white/5 hover:text-white transition-colors;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .layout-grid {
+    @apply grid-cols-1 gap-4 px-3;
+  }
+  
+  .modal-content {
+    @apply mx-4 w-auto;
+  }
+  
+  .card {
+    @apply p-4;
+  }
+  
+  .btn {
+    @apply text-base min-h-12 px-6;
+  }
+}
