@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+openai
+PyMuPDF
+faiss-cpu
+tiktoken
+python-dotenv
+pydantic
+numpy
+requests
+streamlit

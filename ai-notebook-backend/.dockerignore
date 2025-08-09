@@ -1,0 +1,14 @@
+node_modules
+frontend-react/node_modules
+__pycache__
+*.pyc
+.vector_store
+vector_store
+uploads
+.dist
+frontend-react/dist
+.env
+.git
+.gitignore
+.vscode
+.DS_Store

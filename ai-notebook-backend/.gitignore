@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+
+# Envs
+.venv/
+.env
+
+# Data
+uploads/
+vector_store/
+notes.json
+notebooks.json
+files.json
+frontend-react/dist/
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/
