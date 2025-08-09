@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { Chat } from './components/Chat.jsx'
 import { Notes } from './components/Notes.jsx'
 import { Upload } from './components/Upload.jsx'
@@ -13,12 +13,17 @@ import Sidebar from './components/Sidebar.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import Empty from './components/Empty.jsx'
 import Button from './components/ui/button.jsx'
+import Card from './components/ui/Card.jsx'
 import Study from './components/Study.jsx'
+import Dashboard from './components/layout/Dashboard.jsx'
+import NotificationCenter from './components/common/NotificationCenter.jsx'
+import { useKeyboard } from './hooks/useKeyboard.js'
 
 const BASE = import.meta.env.VITE_BACKEND_URL || window.location.origin
 
 export default function App() {
   const toast = useToast()
+  const notificationRef = useRef()
   const [fileId, setFileId] = useState('')
   const [status, setStatus] = useState({ ready: false, error: null })
   const [files, setFiles] = useState([])
@@ -27,11 +32,19 @@ export default function App() {
   const [useNotebook, setUseNotebook] = useState(false)
   const [nbSources, setNbSources] = useState([])
   const [includeSources, setIncludeSources] = useState([])
-  const [tab, setTab] = useState('chat')
+  const [tab, setTab] = useState('dashboard')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [model, setModel] = useState('')
   const [models, setModels] = useState([])
   const [modelDefault, setModelDefault] = useState('')
+
+  // Enhanced notification system
+  const notify = {
+    success: (message, options) => notificationRef.current?.success(message, options),
+    error: (message, options) => notificationRef.current?.error(message, options),
+    warning: (message, options) => notificationRef.current?.warning(message, options),
+    info: (message, options) => notificationRef.current?.info(message, options),
+  }
 
   async function fetchJSON(url, opts) {
     const res = await fetch(url, opts)
@@ -55,6 +68,10 @@ export default function App() {
   }
 
   useEffect(() => { refreshFiles() }, [])
+
+  // Enhanced keyboard shortcuts
+  useKeyboard({ key: 'k', ctrl: true, meta: true }, () => setPaletteOpen(true))
+  useKeyboard('escape', () => setPaletteOpen(false))
 
   // Fetch models once
   useEffect(()=>{
@@ -88,16 +105,6 @@ export default function App() {
       } catch (e) { console.error(e); setNbSources([]); setIncludeSources([]) }
     })()
   }, [nbId])
-
-  useEffect(() => {
-    function onKey(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault(); setPaletteOpen(true)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
 
   // Hash-based tab routing
   useEffect(() => {
@@ -133,65 +140,80 @@ export default function App() {
         <Sidebar current={tab} onChange={setTab} />
         <div className="grid grid-cols-[minmax(340px,520px)_1fr] gap-6 h-full">
           <main className="relative z-[1] grid grid-cols-[minmax(340px,520px)_1fr] gap-6 h-full">
-            <section className="flex flex-col gap-6 overflow-auto min-h-0" aria-label="Sidebar">
-              <motion.div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(2,6,23,0.28)]" initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.05 }} whileHover={{ translateY: -2 }}>
-                <Upload BASE={BASE} onUploaded={(id) => { setFileId(id); refreshFiles(); }} models={models} model={model} modelDefault={modelDefault} onChangeModel={(m)=>{ setModel(m); try{ localStorage.setItem('studylm_model', m||'') }catch{} }} />
-              </motion.div>
-              <motion.div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(2,6,23,0.28)]" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.08 }} whileHover={{ translateY: -2 }}>
+            <section className="flex flex-col gap-6 overflow-auto min-h-0 stagger-children" aria-label="Sidebar">
+              <Card className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+                <Upload BASE={BASE} onUploaded={(id) => { setFileId(id); refreshFiles(); notify.success('File uploaded successfully'); }} models={models} model={model} modelDefault={modelDefault} onChangeModel={(m)=>{ setModel(m); try{ localStorage.setItem('studylm_model', m||'') }catch{} }} />
+              </Card>
+              <Card className="animate-fade-in-up" style={{ animationDelay: '0.08s' }}>
                 <Notebooks BASE={BASE} nbId={nbId} onSelect={setNbId} />
-              </motion.div>
-              <motion.div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(2,6,23,0.28)]" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} whileHover={{ translateY: -2 }}>
+              </Card>
+              <Card className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
                 <NotebookSettings BASE={BASE} nbId={nbId} />
-              </motion.div>
-              <motion.div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(2,6,23,0.28)]" initial={{ y: 22, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.12 }} whileHover={{ translateY: -2 }}>
+              </Card>
+              <Card className="animate-fade-in-up" style={{ animationDelay: '0.12s' }}>
                 <Files BASE={BASE} files={files} fileId={fileId} onSelect={(id) => { setFileId(id); }} status={status} onRefresh={refreshFiles} />
                 <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <label>Attach to notebook</label>
-                  <Button disabled={!nbId || !fileId} onClick={async () => {
-                    if (!nbId || !fileId) return
-                    try {
-                      await (await fetch(`${BASE}/notebooks/${nbId}/sources`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_id: fileId }) })).json()
-                      const next = Array.from(new Set([...(nbSources || []), fileId]))
-                      setNbSources(next)
-                      setIncludeSources(next)
-                      toast.push('Source attached to notebook', 'success')
-                    } catch (e) { console.error(e) }
-                  }}>Attach</Button>
-                  <label className="ml-auto inline-flex gap-1.5 items-center">
-                    <input type="checkbox" checked={useNotebook} onChange={e => { setUseNotebook(e.target.checked); try { localStorage.setItem('studylm_useNotebook', e.target.checked ? '1' : '0') } catch { } }} /> Chat with notebook
+                  <label className="text-sm text-slate-300">Attach to notebook</label>
+                  <Button 
+                    size="sm"
+                    disabled={!nbId || !fileId} 
+                    onClick={async () => {
+                      if (!nbId || !fileId) return
+                      try {
+                        await (await fetch(`${BASE}/notebooks/${nbId}/sources`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_id: fileId }) })).json()
+                        const next = Array.from(new Set([...(nbSources || []), fileId]))
+                        setNbSources(next)
+                        setIncludeSources(next)
+                        notify.success('Source attached to notebook')
+                      } catch (e) { 
+                        console.error(e)
+                        notify.error('Failed to attach source')
+                      }
+                    }}
+                  >
+                    Attach
+                  </Button>
+                  <label className="ml-auto inline-flex gap-1.5 items-center text-sm">
+                    <input 
+                      type="checkbox" 
+                      checked={useNotebook} 
+                      onChange={e => { 
+                        setUseNotebook(e.target.checked); 
+                        try { localStorage.setItem('studylm_useNotebook', e.target.checked ? '1' : '0') } catch { } 
+                      }} 
+                      className="rounded border-white/20 bg-white/5 text-sky-400 focus:ring-sky-400"
+                    /> 
+                    Chat with notebook
                   </label>
                 </div>
-              </motion.div>
+              </Card>
               {tab !== 'facts' && (
-                <motion.div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(2,6,23,0.28)]" initial={{ y: 28, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18 }} whileHover={{ translateY: -2 }}>
+                <Card className="animate-fade-in-up" style={{ animationDelay: '0.18s' }}>
                   <Facts BASE={BASE} nbId={nbId} />
-                </motion.div>
+                </Card>
               )}
               {tab !== 'notes' && (
-                <motion.div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(2,6,23,0.28)]" initial={{ y: 32, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.22 }} whileHover={{ translateY: -2 }}>
+                <Card className="animate-fade-in-up" style={{ animationDelay: '0.22s' }}>
                   <Notes BASE={BASE} fileId={fileId} />
-                </motion.div>
+                </Card>
               )}
             </section>
-            <motion.section className="min-h-[720px] flex flex-col overflow-hidden bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(2,6,23,0.28)]" initial={{ x: 12, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.1 }} aria-live="polite">
+            <Card className="min-h-[720px] flex flex-col overflow-hidden animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
               <AnimatePresence mode="wait">
                 {tab === 'dashboard' && (
-                  <div>
-                    <h2 className="text-lg font-semibold">Welcome to StudyLM</h2>
-                    <p className="text-slate-400 text-[0.9rem]">Upload PDFs, create notebooks, ask questions with citations, and generate study aids.</p>
-                    <div className="flex items-center gap-2 my-3">
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[0.8rem] border border-white/20 bg-white/10">Files: {(files || []).length}</span>
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[0.8rem] border border-white/20 bg-white/10">Notebook: {nbId ? (nbTitle || nbId.slice(0, 8) + '…') : 'None selected'}</span>
-                    </div>
-                    <div className="mt-3">
-                      <Empty title="Get started" subtitle="Upload a PDF, then create a notebook to organize your sources and settings." action={
-                        <div className="inline-flex gap-2">
-                          <Button onClick={() => document.querySelector('input[type=file]')?.click()}>Upload PDF</Button>
-                          <Button variant="outline" onClick={() => setTab('notebooks')}>Create a notebook</Button>
-                        </div>
-                      } />
-                    </div>
-                  </div>
+                  <motion.div key="dashboard" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+                    <Dashboard 
+                      files={files}
+                      nbId={nbId}
+                      nbTitle={nbTitle}
+                      onNavigate={setTab}
+                      stats={{
+                        filesCount: files.length,
+                        notebooksCount: nbId ? 1 : 0,
+                        chatMessages: 0
+                      }}
+                    />
+                  </motion.div>
                 )}
                 {tab === 'chat' && (
                   <motion.div key="chat" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
@@ -237,7 +259,7 @@ export default function App() {
                   </div>
                 )}
               </AnimatePresence>
-            </motion.section>
+            </Card>
           </main>
         </div>
       </div>
@@ -248,17 +270,21 @@ export default function App() {
           } else if (cmd === 'new-notebook') {
             setTab('notebooks')
           } else if (cmd === 'clear-chat') {
-            if (!nbId) return toast.push('Select a notebook first', 'error')
+            if (!nbId) return notify.error('Select a notebook first')
             await fetch(`${BASE}/notebooks/${nbId}/history`, { method: 'DELETE' })
-            toast.push('Chat cleared', 'success')
+            notify.success('Chat cleared')
           } else if (cmd === 'attach-source') {
-            if (!nbId || !fileId) return toast.push('Pick a notebook and file', 'error')
+            if (!nbId || !fileId) return notify.error('Pick a notebook and file')
             await fetch(`${BASE}/notebooks/${nbId}/sources`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_id: fileId }) })
             const next = Array.from(new Set([...(nbSources || []), fileId])); setNbSources(next); setIncludeSources(next)
-            toast.push('Source attached', 'success')
+            notify.success('Source attached')
           }
-        } catch (e) { toast.push('Action failed', 'error') }
+        } catch (e) { 
+          console.error(e)
+          notify.error('Action failed')
+        }
       }} />
+      <NotificationCenter ref={notificationRef} />
     </div>
   )
 }
