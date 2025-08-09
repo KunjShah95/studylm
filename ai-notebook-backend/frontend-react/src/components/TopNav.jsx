@@ -1,30 +1,160 @@
 import React from 'react'
-import ThemeToggle from './ThemeToggle.jsx'
-import DensityToggle from './DensityToggle.jsx'
+import { motion } from 'framer-motion'
+import { 
+  BookOpenIcon, 
+  CommandLineIcon, 
+  MoonIcon, 
+  SunIcon, 
+  Cog6ToothIcon,
+  UserCircleIcon,
+  BellIcon,
+  MagnifyingGlassIcon
+} from '@heroicons/react/24/outline'
+import Button from './ui/button'
+import { Badge } from './ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
+import { cn } from '../lib/utils'
 
-export default function TopNav({ onSearch, nbId, nbTitle, models=[], modelDefault='', model='', onChangeModel }){
+export default function TopNav({ 
+  nbTitle, 
+  useNotebook, 
+  setPaletteOpen, 
+  theme, 
+  setTheme,
+  className 
+}) {
+  const [notifications] = React.useState(3) // Mock notifications
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark')
+  }
+
   return (
-    <div className="sticky top-0 z-50 flex items-center justify-between min-h-16 px-4 py-3 bg-slate-950/60 border-b border-white/20 backdrop-blur">
-      <div className="flex items-center gap-3">
-        <div className="w-7 h-7 rounded-xl border border-white/20 bg-[linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.03))]" aria-hidden="true" />
-        <strong className="mr-1">StudyLM</strong>
-        <a href="/#/dashboard" className="text-slate-400 px-2 py-1 rounded-lg hover:bg-white/5 hover:text-white">Dashboard</a>
-        <a href="/#/chat" className="text-slate-400 px-2 py-1 rounded-lg hover:bg-white/5 hover:text-white">Workspace</a>
-        <a href="/docs" target="_blank" rel="noreferrer" className="text-slate-400 px-2 py-1 rounded-lg hover:bg-white/5 hover:text-white">Docs</a>
+    <motion.header 
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className={cn(
+        "sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md dark:border-gray-700 dark:bg-gray-900/80",
+        className
+      )}
+    >
+      <div className="container-custom">
+        <div className="flex h-16 items-center justify-between">
+          {/* Left Section - Logo & Title */}
+          <div className="flex items-center gap-4">
+            <motion.div 
+              className="flex items-center gap-3"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg">
+                <BookOpenIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold gradient-text">StudyLM</h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">AI Research Assistant</p>
+              </div>
+            </motion.div>
+
+            {/* Current Context */}
+            {useNotebook && nbTitle && (
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="hidden md:flex items-center gap-2"
+              >
+                <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+                <Badge variant="outline" className="gap-1">
+                  <BookOpenIcon className="h-3 w-3" />
+                  {nbTitle}
+                </Badge>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Center Section - Search */}
+          <div className="hidden md:flex flex-1 max-w-md mx-8">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-gray-500 dark:text-gray-400"
+              onClick={() => setPaletteOpen(true)}
+            >
+              <MagnifyingGlassIcon className="h-4 w-4" />
+              <span>Search or run command...</span>
+              <div className="ml-auto flex gap-1">
+                <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-gray-100 px-1.5 font-mono text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                  ⌘K
+                </kbd>
+              </div>
+            </Button>
+          </div>
+
+          {/* Right Section - Actions */}
+          <div className="flex items-center gap-2">
+            {/* Mobile Search */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setPaletteOpen(true)}
+            >
+              <MagnifyingGlassIcon className="h-5 w-5" />
+            </Button>
+
+            {/* Command Palette */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setPaletteOpen(true)}
+              className="hidden md:flex"
+            >
+              <CommandLineIcon className="h-5 w-5" />
+            </Button>
+
+            {/* Notifications */}
+            <Button variant="ghost" size="icon" className="relative">
+              <BellIcon className="h-5 w-5" />
+              {notifications > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs"
+                >
+                  {notifications}
+                </Badge>
+              )}
+            </Button>
+
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="transition-transform hover:scale-110"
+            >
+              {theme === 'dark' ? (
+                <SunIcon className="h-5 w-5" />
+              ) : (
+                <MoonIcon className="h-5 w-5" />
+              )}
+            </Button>
+
+            {/* Settings */}
+            <Button variant="ghost" size="icon">
+              <Cog6ToothIcon className="h-5 w-5" />
+            </Button>
+
+            {/* User Avatar */}
+            <div className="flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src="/api/placeholder/32/32" alt="User" />
+                <AvatarFallback>
+                  <UserCircleIcon className="h-5 w-5" />
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        {nbId && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[0.8rem] border border-white/20 bg-white/10" title={nbId}>
-            Notebook: <strong style={{marginLeft:4}}>{nbTitle || nbId.slice(0,8)+'…'}</strong>
-          </span>
-        )}
-  {/* Global model selector moved next to Upload for prominence */}
-        <button className="bg-transparent border border-white/20 text-white hover:bg-white/5 rounded-lg px-3.5 py-2" onClick={onSearch} title="Search (Ctrl+K)">Search</button>
-  <ThemeToggle />
-  <DensityToggle />
-        <a className="relative bg-gradient-to-br from-sky-400 to-sky-500 text-black rounded-lg px-3.5 py-2 hover:brightness-105 active:translate-y-px" href="#" onClick={(e)=> e.preventDefault()} title="Upgrade plan">Upgrade</a>
-        <div className="w-7 h-7 rounded-full border border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.04))]" aria-label="Account" title="Account" />
-      </div>
-    </div>
+    </motion.header>
   )
 }
