@@ -1,39 +1,41 @@
 services:
   backend:
-      build:
-        context: .
-        dockerfile: Dockerfile.backend
-      image: studylm-backend:latest
-      environment:
-        - OPENAI_API_KEY=${OPENAI_API_KEY}
-        - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-*}
-        - HEALTHCHECK_TOKEN=${HEALTHCHECK_TOKEN}
-      volumes:
-        - ./uploads:/app/uploads
-        - ./vector_store:/app/vector_store
-      # Do not publish backend directly; frontend will proxy
-      # ports:
-      #   - "8000:8000"
-      healthcheck:
-        test: >-
-          curl -fsS -H "x-internal=${HEALTHCHECK_TOKEN:-${OPENAI_API_KEY}}" http://127.0.0.1:8000/health || exit 1
-        interval: 30s
-        timeout: 5s
-        start_period: 10s
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: studylm-backend:latest
+    restart: unless-stopped
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-*}
+      - HEALTHCHECK_TOKEN=${HEALTHCHECK_TOKEN}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./vector_store:/app/vector_store
+    # Do not publish backend directly; frontend will proxy
+    # ports:
+    #   - "8000:8000"
+    healthcheck:
+      test: >-
+        curl -fsS -H "x-internal: ${HEALTHCHECK_TOKEN:-${OPENAI_API_KEY}}" http://127.0.0.1:8000/health || exit 1
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
 
   frontend:
-      build:
-        context: ./frontend-react
-        dockerfile: Dockerfile.frontend
-      image: studylm-frontend:latest
-      depends_on:
-        backend:
-          condition: service_healthy
-      ports:
-        - "8080:80"
-      environment:
-        - API_BASE=/api
-      # No volumes by default; SPA is static
+    build:
+      context: ./frontend-react
+      dockerfile: Dockerfile.frontend
+    image: studylm-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      - API_BASE=/api
+    # No volumes by default; SPA is static
 
 networks:
   default:

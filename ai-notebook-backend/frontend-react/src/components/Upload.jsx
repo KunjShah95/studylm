@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -14,11 +14,57 @@ import { Badge } from './ui/badge'
 import { LoadingSpinner } from './ui/spinner'
 import { formatFileSize } from '../lib/utils'
 
-export function Upload({ onUpload, refreshFiles, toast }) {
+export function Upload({ base = '', onUpload, refreshFiles, toast }) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [errors, setErrors] = useState([])
+
+  const pollersRef = useRef({})
+
+  const stopPoller = (id) => {
+    const t = pollersRef.current[id]
+    if (t) {
+      clearTimeout(t)
+      delete pollersRef.current[id]
+    }
+  }
+
+  const pollStatusOnce = async (fid, attempt = 0) => {
+    try {
+      const res = await fetch(`${base}/status/${fid}`)
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      // Update stage text and ready state
+      setUploadedFiles(prev => prev.map(f => (
+        f.id === fid ? { ...f, stage: data.stage || null, status: data.ready ? 'success' : f.status } : f
+      )))
+      if (data.ready) {
+        stopPoller(fid)
+        return
+      }
+      if (attempt < 60) {
+        // Try again after 2s, up to ~2 minutes
+        pollersRef.current[fid] = setTimeout(() => pollStatusOnce(fid, attempt + 1), 2000)
+      } else {
+        stopPoller(fid)
+      }
+    } catch (e) {
+      // Mark error for this file and stop polling
+      setUploadedFiles(prev => prev.map(f => (
+        f.id === fid ? { ...f, status: 'error' } : f
+      )))
+      stopPoller(fid)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      // cleanup any pending timers on unmount
+      Object.values(pollersRef.current).forEach((t) => clearTimeout(t))
+      pollersRef.current = {}
+    }
+  }, [])
 
   const onDrop = useCallback(async (acceptedFiles, rejectedFiles) => {
     // Handle rejected files
@@ -47,7 +93,7 @@ export function Upload({ onUpload, refreshFiles, toast }) {
           setUploadProgress(prev => Math.min(prev + 10, 90))
         }, 100)
 
-        const response = await fetch('/upload', {
+        const response = await fetch(`${base}/upload`, {
           method: 'POST',
           body: formData,
         })
@@ -60,13 +106,17 @@ export function Upload({ onUpload, refreshFiles, toast }) {
         }
 
         const result = await response.json()
-        
+
         setUploadedFiles(prev => [...prev, {
           id: result.file_id,
           name: file.name,
           size: file.size,
-          status: 'success'
+          status: 'indexing',
+          stage: 'parsing'
         }])
+
+        // begin polling status for this file until ready
+        pollStatusOnce(result.file_id, 0)
 
         if (onUpload) onUpload(result.file_id)
         toast?.success(`${file.name} uploaded successfully`)
@@ -84,7 +134,7 @@ export function Upload({ onUpload, refreshFiles, toast }) {
         setUploadedFiles([])
       }, 3000)
     }
-  }, [onUpload, refreshFiles, toast])
+  }, [onUpload, refreshFiles, toast, base])
 
   const {
     getRootProps,
@@ -231,10 +281,16 @@ export function Upload({ onUpload, refreshFiles, toast }) {
                         </p>
                         <p className="text-xs text-gray-500">
                           {formatFileSize(file.size)}
+                          {file.stage && (
+                            <span className="ml-2 text-gray-400">• {file.stage}</span>
+                          )}
                         </p>
                       </div>
                       {file.status === 'success' && (
                         <CheckCircleIcon className="h-5 w-5 text-success-600" />
+                      )}
+                      {file.status === 'indexing' && (
+                        <LoadingSpinner size="sm" />
                       )}
                       {file.status === 'error' && (
                         <ExclamationTriangleIcon className="h-5 w-5 text-error-600" />

@@ -146,7 +146,7 @@ export default function TopNav({
             {/* User Avatar */}
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
-                <AvatarImage src="/api/placeholder/32/32" alt="User" />
+                <AvatarImage src="/studylm.svg" alt="User" />
                 <AvatarFallback>
                   <UserCircleIcon className="h-5 w-5" />
                 </AvatarFallback>

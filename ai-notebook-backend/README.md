@@ -53,6 +53,8 @@ Client handoff checklist:
 - Confirm uploads/ and vector_store/ are writable (they’re gitignored).
 - Use React dev server in development or the built assets route `/app` in production.
 
+Production deployment guide: see `PRODUCTION.md` for hardened Nginx config, env, and ops.
+
 ### .env
 
 ```env
