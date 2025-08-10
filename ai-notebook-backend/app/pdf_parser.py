@@ -1,6 +1,15 @@
 import fitz
 import tiktoken
 from .config import settings
+from typing import Optional
+
+# Optional OCR deps (available when Tesseract is installed)
+try:
+    import pytesseract  # type: ignore
+    from PIL import Image  # type: ignore
+    _OCR_AVAILABLE = True
+except Exception:
+    _OCR_AVAILABLE = False
 
 encoder = tiktoken.get_encoding("cl100k_base")
 
@@ -25,8 +34,47 @@ def extract_text(pdf_path: str) -> list[dict]:
         )
     pages = []
     for i, page in enumerate(doc, start=1):
-        pages.append({"page": i, "text": page.get_text()})
+        txt = page.get_text() or ""
+        # If page seems to contain no text and OCR is enabled/available, try OCR as fallback
+        if settings.OCR_ENABLED and _looks_like_no_text(txt):
+            ocr_txt = _ocr_page_text(page)
+            if ocr_txt:
+                txt = ocr_txt
+        pages.append({"page": i, "text": txt})
     return pages
+
+
+def _looks_like_no_text(text: str) -> bool:
+    """Heuristic: decide when to attempt OCR fallback.
+    Consider 'no text' if stripped length is very small or whitespace-heavy.
+    """
+    s = (text or "").strip()
+    if not s:
+        return True
+    # Very low character count indicates likely scanned page
+    return len(s) < 30
+
+
+def _ocr_page_text(page: "fitz.Page") -> Optional[str]:
+    if not _OCR_AVAILABLE:
+        return None
+    try:
+        # Render to image at configured DPI
+        dpi = max(72, int(getattr(settings, "OCR_DPI", 200)))
+        scale = dpi / 72.0
+        mat = fitz.Matrix(scale, scale)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        import io
+
+        png_bytes = pix.tobytes("png")
+        img = Image.open(io.BytesIO(png_bytes))
+        # Allow custom Tesseract lang via settings
+        lang = getattr(settings, "OCR_LANGUAGE", "eng") or "eng"
+        cfg = getattr(settings, "OCR_TESSERACT_CONFIG", None)
+        text = pytesseract.image_to_string(img, lang=lang, config=cfg)
+        return (text or "").strip()
+    except Exception:
+        return None
 
 def _split_by_tokens(text: str, max_tokens: int) -> list[str]:
     toks = encoder.encode(text)

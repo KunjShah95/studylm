@@ -3,11 +3,29 @@ import uuid
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import RedirectResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.pdf_parser import extract_text, chunk_text
+from pathlib import Path
+import io
+import re
+import requests
+from bs4 import BeautifulSoup
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    _YT_AVAILABLE = True
+except Exception:
+    _YT_AVAILABLE = False
+try:
+    import pytesseract
+    from PIL import Image
+    _OCR_AVAILABLE = True
+except Exception:
+    _OCR_AVAILABLE = False
+ 
 from app.embeddings import embed_texts
 from app.vector_store import build_index, save_index, load_index, search
 from app.db import (
@@ -34,6 +52,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class ApiPrefixMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        path = request.scope.get("path", "")
+        if path.startswith("/api/"):
+            request.scope["path"] = path[4:]
+            raw = request.scope.get("raw_path")
+            if isinstance(raw, (bytes, bytearray)) and raw.startswith(b"/api/"):
+                request.scope["raw_path"] = raw[4:]
+        return await call_next(request)
+
+
+app.add_middleware(ApiPrefixMiddleware)
 
 @app.get("/models")
 def list_models():
@@ -95,6 +127,22 @@ def _read_stage(file_id: str) -> str | None:
     return p.read_text(encoding="utf8").strip() if p.exists() else None
 
 
+def _source_url(file_id: str, page_start: int | None = None) -> str | None:
+    """Return a best-available URL to the uploaded source for this file_id.
+    Prefers PDF if present (adds #page anchor), else PNG, JPG, then TXT.
+    """
+    pdf = UPLOADS_DIR / f"{file_id}.pdf"
+    if pdf.exists():
+        if page_start:
+            return f"/uploads/{file_id}.pdf#page={page_start}"
+        return f"/uploads/{file_id}.pdf"
+    for ext in ("png", "jpg", "txt"):
+        p = UPLOADS_DIR / f"{file_id}.{ext}"
+        if p.exists():
+            return f"/uploads/{file_id}.{ext}"
+    return None
+
+
 @app.get("/")
 def root():
     """Landing route -> React app if built, otherwise safe info (docs hidden by default)."""
@@ -125,7 +173,12 @@ def upload_form():
 
 @app.get("/uploads-list")
 def list_uploads():
-    files = sorted([p.name for p in UPLOADS_DIR.glob("*.pdf")])
+    # include common types we save
+    patterns = ["*.pdf", "*.png", "*.jpg", "*.jpeg", "*.txt"]
+    names = []
+    for pat in patterns:
+        names += [p.name for p in UPLOADS_DIR.glob(pat)]
+    files = sorted(names)
     return {"files": files, "base_url": "/uploads/"}
 
 
@@ -177,6 +230,121 @@ def process_pdf(temp_path: Path, file_id: str):
     # Note: keep the uploaded PDF file for viewing; do not delete temp_path
     _write_stage(file_id, "done")
     print(f"Done {file_id}")
+
+
+# --------------------------- Image OCR ingestion ---------------------------
+@app.post("/upload_image")
+async def upload_image(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    if file.content_type not in {"image/png", "image/jpeg", "image/jpg"}:
+        raise HTTPException(status_code=400, detail="Only PNG/JPEG images allowed")
+    if not _OCR_AVAILABLE:
+        raise HTTPException(status_code=500, detail="OCR not available (pytesseract/Pillow not installed)")
+    file_id = str(uuid.uuid4())
+    # preserve extension for serving/viewing
+    ext = ".png" if file.content_type == "image/png" else ".jpg"
+    temp_path = UPLOADS_DIR / f"{file_id}{ext}"
+    with open(temp_path, "wb") as f:
+        f.write(await file.read())
+    background_tasks.add_task(process_image, temp_path, file_id)
+    return {"file_id": file_id, "message": "Image queued for OCR and processing."}
+
+
+def process_image(temp_path: Path, file_id: str):
+    try:
+        img = Image.open(temp_path)
+        lang = getattr(settings, "OCR_LANGUAGE", "eng") or "eng"
+        cfg = getattr(settings, "OCR_TESSERACT_CONFIG", None)
+        text = pytesseract.image_to_string(img, lang=lang, config=cfg)
+        # Wrap as a single-page doc for downstream pipeline
+        pages = [{"page": 1, "text": text.strip()}]
+        chunks = chunk_text(pages)
+        embeddings = embed_texts([c["text"] for c in chunks])
+        idx = build_index(embeddings)
+        save_index(idx, file_id)
+        mapping_file = Path(VECTORS_DIR) / f"{file_id}_chunks.json"
+        mapping_file.write_text(json.dumps(chunks, indent=2), encoding="utf8")
+        _write_stage(file_id, "done")
+    except Exception as e:
+        (VECTORS_DIR / f"{file_id}.error.txt").write_text(str(e), encoding="utf8")
+        _write_stage(file_id, "error")
+
+
+# --------------------------- URL ingestion ---------------------------
+class IngestUrl(BaseModel):
+    url: str
+
+
+def _is_youtube_url(u: str) -> bool:
+    return any(x in u for x in ["youtube.com/watch", "youtube.com/shorts", "youtu.be/"])
+
+
+def _extract_youtube_id(u: str) -> str | None:
+    # Try patterns for youtu.be/<id> and youtube.com/watch?v=<id>
+    m = re.search(r"youtu\.be/([A-Za-z0-9_-]{6,})", u)
+    if m:
+        return m.group(1)
+    m = re.search(r"v=([A-Za-z0-9_-]{6,})", u)
+    if m:
+        return m.group(1)
+    # shorts
+    m = re.search(r"/shorts/([A-Za-z0-9_-]{6,})", u)
+    if m:
+        return m.group(1)
+    return None
+
+
+@app.post("/ingest_url")
+def ingest_url(payload: IngestUrl):
+    u = (payload.url or "").strip()
+    if not (u.startswith("http://") or u.startswith("https://")):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+    text = ""
+    title = None
+    if _is_youtube_url(u) and _YT_AVAILABLE:
+        vid = _extract_youtube_id(u)
+        if not vid:
+            raise HTTPException(status_code=400, detail="Could not parse YouTube ID")
+        try:
+            transcript = YouTubeTranscriptApi.get_transcript(vid)
+            text = "\n".join([seg.get("text") or "" for seg in transcript])
+            title = f"YouTube:{vid}"
+        except Exception:
+            # Fallback to fetching HTML and parsing text if transcript not available
+            pass
+    if not text:
+        try:
+            resp = requests.get(u, timeout=20)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # simple extraction: title + visible text
+            t = soup.find("title")
+            title = (t.get_text(strip=True) if t else None) or u
+            # remove script/style
+            for tag in soup(["script", "style", "noscript"]):
+                tag.extract()
+            text = soup.get_text("\n")
+            text = re.sub(r"\n{2,}", "\n\n", (text or "").strip())
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {e}")
+
+    if not text:
+        raise HTTPException(status_code=400, detail="No text extracted from URL")
+
+    file_id = str(uuid.uuid4())
+    # Save a reference .txt file for viewing
+    txt_path = UPLOADS_DIR / f"{file_id}.txt"
+    txt_path.write_text(f"Source: {u}\n\n{title or ''}\n\n{text}", encoding="utf8")
+
+    # Index
+    pages = [{"page": 1, "text": text}]
+    chunks = chunk_text(pages)
+    embeddings = embed_texts([c["text"] for c in chunks])
+    idx = build_index(embeddings)
+    save_index(idx, file_id)
+    mapping_file = Path(VECTORS_DIR) / f"{file_id}_chunks.json"
+    mapping_file.write_text(json.dumps(chunks, indent=2), encoding="utf8")
+    _write_stage(file_id, "done")
+    return {"file_id": file_id, "message": "URL ingested and indexed"}
 
 
 class AskRequest(BaseModel):
@@ -236,9 +404,7 @@ async def ask(payload: AskRequest):
     for c in context_chunks:
         page_start = c.get("page_start")
         page_end = c.get("page_end")
-        url = (
-            f"/uploads/{payload.file_id}.pdf#page={page_start}" if page_start else None
-        )
+        url = _source_url(payload.file_id, page_start)
         citations.append(
             {
                 "page_start": page_start,
@@ -509,7 +675,7 @@ def ask_notebook(nb_id: str, payload: NotebookAsk):
     for sc, fid, idx_i, chunk in top:
         page_start = chunk.get("page_start")
         page_end = chunk.get("page_end")
-        url = f"/uploads/{fid}.pdf#page={page_start}" if page_start else None
+        url = _source_url(fid, page_start)
         citations.append(
             {
                 "file_id": fid,
@@ -890,12 +1056,17 @@ def patch_file_label(file_id: str, payload: FileLabelPatch):
 
 @app.get("/files")
 def list_files():
-    """List uploaded PDFs with optional labels from files.json."""
-    files = sorted([p.name for p in UPLOADS_DIR.glob("*.pdf")])
+    """List uploaded sources (pdf, images, text) with optional labels from files.json."""
+    patterns = ["*.pdf", "*.png", "*.jpg", "*.jpeg", "*.txt"]
+    names = []
+    for pat in patterns:
+        names += [p.name for p in UPLOADS_DIR.glob(pat)]
+    files = sorted(names)
     meta = load_files_meta()
     out = []
     for name in files:
-        fid = name.replace('.pdf','')
+        # derive file_id from prefix before extension
+        fid = name.split('.')[0]
         out.append({"file": name, "file_id": fid, "label": (meta.get(fid) or {}).get("label")})
     return {"files": out, "base_url": "/uploads/"}
 
@@ -933,9 +1104,15 @@ def status(file_id: str):
 @app.get("/file/{file_id}")
 def get_file_info(file_id: str):
     pdf_path = UPLOADS_DIR / f"{file_id}.pdf"
+    png_path = UPLOADS_DIR / f"{file_id}.png"
+    jpg_path = UPLOADS_DIR / f"{file_id}.jpg"
+    txt_path = UPLOADS_DIR / f"{file_id}.txt"
     idx_path = Path(VECTORS_DIR) / f"{file_id}.faiss"
     chunks_path = Path(VECTORS_DIR) / f"{file_id}_chunks.json"
     exists_pdf = pdf_path.exists()
+    exists_png = png_path.exists()
+    exists_jpg = jpg_path.exists()
+    exists_txt = txt_path.exists()
     size_bytes = pdf_path.stat().st_size if exists_pdf else 0
     size_mb = round(size_bytes / (1024 * 1024), 2) if exists_pdf else 0
     pages = None
@@ -953,6 +1130,9 @@ def get_file_info(file_id: str):
     return {
         "file_id": file_id,
         "exists_pdf": exists_pdf,
+    "exists_png": exists_png,
+    "exists_jpg": exists_jpg,
+    "exists_txt": exists_txt,
         "size_bytes": size_bytes,
         "size_mb": size_mb,
         "pages": pages,
@@ -965,8 +1145,8 @@ def get_file_info(file_id: str):
 @app.delete("/file/{file_id}")
 def delete_file(file_id: str):
     removed = []
-    for p in [
-        UPLOADS_DIR / f"{file_id}.pdf",
+    # remove any uploaded variant with this id
+    for p in list(UPLOADS_DIR.glob(f"{file_id}.*")) + [
         Path(VECTORS_DIR) / f"{file_id}.faiss",
         Path(VECTORS_DIR) / f"{file_id}_chunks.json",
         Path(VECTORS_DIR) / f"{file_id}.error.txt",

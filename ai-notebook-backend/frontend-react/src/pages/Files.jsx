@@ -61,7 +61,7 @@ export default function Files({ base = '' }) {
                 <span className="font-semibold text-gray-900 dark:text-gray-100 truncate">{f.label || f.file}</span>
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400 truncate mb-2">ID: {f.file_id}</div>
-              <a href={`/uploads/${f.file}`} target="_blank" rel="noreferrer" className="btn btn-outline w-full">View PDF</a>
+              <a href={`${base}/uploads/${f.file}`} target="_blank" rel="noreferrer" className="btn btn-outline w-full">Open</a>
             </li>
           ))}
         </ul>

@@ -115,6 +115,14 @@ export default function Chat({ base = '' }) {
     } catch {}
   }
 
+  const isImageUrl = (u) => /\.(png|jpg|jpeg)(#.*)?$/i.test(u || '')
+
+  const copyShareMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(formatMarkdown())
+    } catch {}
+  }
+
   const onKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !loading && fileId && question.trim()) {
       ask()
@@ -173,6 +181,11 @@ export default function Chat({ base = '' }) {
                       {c.url && (
                         <button className="btn btn-ghost ml-2" onClick={() => copyCitationLink(c.url)}>Copy link</button>
                       )}
+                      {c.url && isImageUrl(c.url) && (
+                        <div className="mt-2">
+                          <img src={c.url} alt={`Citation ${i + 1}`} style={{ maxWidth: '280px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -182,6 +195,7 @@ export default function Chat({ base = '' }) {
               <button className="btn btn-outline" onClick={copyAnswer}>Copy</button>
               <button className="btn btn-outline" onClick={downloadMarkdown}>Download .md</button>
               <button className="btn btn-secondary" onClick={systemShare}>Share…</button>
+              <button className="btn btn-ghost" onClick={copyShareMarkdown}>Copy share text</button>
             </div>
           </div>
         ) : (

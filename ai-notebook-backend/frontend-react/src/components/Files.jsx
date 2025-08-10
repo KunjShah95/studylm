@@ -43,7 +43,7 @@ export function Files({ BASE, files, fileId, onSelect, status, onRefresh }){
   // Keep local label input in sync when selection changes
   useEffect(()=>{
     if(!fileId){ setLabel(''); return }
-    const f = (files||[]).find(x => (x.file_id||'')===fileId || (x.file||'').replace(/\.pdf$/,'')===fileId)
+  const f = (files||[]).find(x => (x.file_id||'')===fileId || (x.file||'').split('.')[0]===fileId)
     setLabel(f?.label || '')
   }, [fileId, files])
 
@@ -62,7 +62,7 @@ export function Files({ BASE, files, fileId, onSelect, status, onRefresh }){
     const term = q.trim().toLowerCase()
     if(!term) return files||[]
     return (files||[]).filter(f=>{
-      const id = f.file_id || (f.file||'').replace(/\.pdf$/, '')
+      const id = f.file_id || (f.file||'').split('.')[0]
       return id.toLowerCase().includes(term) || (f.file||'').toLowerCase().includes(term) || (f.label||'').toLowerCase().includes(term)
     })
   }, [files, q])
@@ -94,8 +94,8 @@ export function Files({ BASE, files, fileId, onSelect, status, onRefresh }){
         <select className="max-w-[420px] h-9 rounded-md bg-white/10 border border-white/25 text-white px-2 focus:outline-none focus:ring-2 focus:ring-sky-400" value={fileId} onChange={e=>onSelect(e.target.value)} disabled={noFiles}>
           <option value="">Select…</option>
           {filtered.map(f=>{
-            const id = f.file_id || (f.file||'').replace(/\.pdf$/, '')
-            const name = f.file || `${id}.pdf`
+            const id = f.file_id || (f.file||'').split('.')[0]
+            const name = f.file || `${id}`
             const label = f.label ? ` — ${f.label}` : ''
             return <option key={id} value={id}>{name}{label}</option>
           })}
@@ -124,7 +124,18 @@ export function Files({ BASE, files, fileId, onSelect, status, onRefresh }){
             <div className="text-slate-400 text-[0.9rem]">Size</div><div>{info.size_mb} MB</div>
             <div className="text-slate-400 text-[0.9rem]">Pages</div><div>{info.pages ?? '-'}</div>
             <div className="text-slate-400 text-[0.9rem]">Indexed</div><div>{info.indexed ? 'Yes' : 'No'}</div>
-            <div className="text-slate-400 text-[0.9rem]">PDF</div><div>{info.exists_pdf ? (<a className="text-sky-400 hover:underline" href={`${BASE}/uploads/${fileId}.pdf`} target="_blank" rel="noreferrer">Open</a>) : '—'}</div>
+            <div className="text-slate-400 text-[0.9rem]">Source</div>
+            <div className="text-slate-400 text-[0.9rem]">
+              {info.exists_pdf ? (
+                <a className="text-sky-400 hover:underline" href={`${BASE}/uploads/${fileId}.pdf`} target="_blank" rel="noreferrer">Open PDF</a>
+              ) : (
+                <>
+                  <a className="text-sky-400 hover:underline" href={`${BASE}/uploads/${fileId}.png`} target="_blank" rel="noreferrer">Open PNG</a> <span className="mx-1">/</span>
+                  <a className="text-sky-400 hover:underline" href={`${BASE}/uploads/${fileId}.jpg`} target="_blank" rel="noreferrer">Open JPG</a> <span className="mx-1">/</span>
+                  <a className="text-sky-400 hover:underline" href={`${BASE}/uploads/${fileId}.txt`} target="_blank" rel="noreferrer">Open TXT</a>
+                </>
+              )}
+            </div>
             <div className="text-slate-400 text-[0.9rem]">Label</div>
             <div className="flex gap-1.5">
               <Input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Optional label" />

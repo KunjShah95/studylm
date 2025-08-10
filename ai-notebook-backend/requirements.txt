@@ -10,3 +10,7 @@ pydantic
 numpy
 requests
 streamlit
+pillow
+pytesseract
+beautifulsoup4
+youtube-transcript-api

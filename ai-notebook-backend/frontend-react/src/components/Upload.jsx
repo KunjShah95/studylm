@@ -19,6 +19,8 @@ export function Upload({ base = '', onUpload, refreshFiles, toast }) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [errors, setErrors] = useState([])
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkLoading, setLinkLoading] = useState(false)
 
   const pollersRef = useRef({})
 
@@ -85,15 +87,18 @@ export function Upload({ base = '', onUpload, refreshFiles, toast }) {
     try {
       for (let i = 0; i < acceptedFiles.length; i++) {
         const file = acceptedFiles[i]
-        const formData = new FormData()
-        formData.append('file', file)
+  const formData = new FormData()
+  formData.append('file', file)
 
         // Simulate upload progress
         const progressInterval = setInterval(() => {
           setUploadProgress(prev => Math.min(prev + 10, 90))
         }, 100)
 
-        const response = await fetch(`${base}/upload`, {
+  // Route based on type
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+  const endpoint = isPdf ? '/upload' : '/upload_image'
+  const response = await fetch(`${base}${endpoint}`, {
           method: 'POST',
           body: formData,
         })
@@ -145,7 +150,8 @@ export function Upload({ base = '', onUpload, refreshFiles, toast }) {
   } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf']
+      'application/pdf': ['.pdf'],
+      'image/*': ['.png', '.jpg', '.jpeg']
     },
     maxSize: 20 * 1024 * 1024, // 20MB
     maxFiles: 5,
@@ -193,18 +199,18 @@ export function Upload({ base = '', onUpload, refreshFiles, toast }) {
 
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {isDragActive ? 'Drop files here' : 'Upload PDF documents'}
+                    {isDragActive ? 'Drop files here' : 'Upload PDFs or Images'}
                   </h3>
                   <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                     {isDragActive 
                       ? 'Release to upload your files'
-                      : 'Drag and drop your PDF files here, or click to browse'
+                      : 'Drag and drop PDF or PNG/JPG files here, or click to browse'
                     }
                   </p>
                 </div>
 
                 <div className="flex flex-wrap justify-center gap-2">
-                  <Badge variant="secondary">PDF only</Badge>
+                  <Badge variant="secondary">PDF, PNG, JPG</Badge>
                   <Badge variant="secondary">Max 20MB</Badge>
                   <Badge variant="secondary">Up to 5 files</Badge>
                 </div>
@@ -353,6 +359,42 @@ export function Upload({ base = '', onUpload, refreshFiles, toast }) {
         )}
       </AnimatePresence>
 
+      {/* Add by Link */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <input
+              type="url"
+              placeholder="Paste a web page or YouTube URL and press Add"
+              value={linkUrl}
+              onChange={(e)=>setLinkUrl(e.target.value)}
+              className="flex-1 h-9 rounded-md bg-white/10 border border-white/25 text-white px-2 focus:outline-none focus:ring-2 focus:ring-sky-400"
+            />
+            <Button disabled={linkLoading || !linkUrl.trim()} onClick={async()=>{
+              const url = linkUrl.trim()
+              if(!url) return
+              setLinkLoading(true)
+              try{
+                const res = await fetch(`${base}/ingest_url`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) })
+                if(!res.ok){ throw new Error(await res.text()) }
+                const data = await res.json()
+                const fid = data.file_id
+                setUploadedFiles(prev => [...prev, { id: fid, name: url, size: 0, status: 'indexing', stage: 'parsing' }])
+                pollStatusOnce(fid, 0)
+                toast?.success('Link ingested')
+                setLinkUrl('')
+                refreshFiles && refreshFiles()
+              }catch(e){
+                toast?.error('Failed to ingest link')
+              }finally{
+                setLinkLoading(false)
+              }
+            }}>{linkLoading ? 'Adding…' : 'Add'}</Button>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">We’ll fetch readable text or transcripts and index them for Q&A.</p>
+        </CardContent>
+      </Card>
+
       {/* Upload Tips */}
       <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
         <CardContent className="p-4">
@@ -360,10 +402,11 @@ export function Upload({ base = '', onUpload, refreshFiles, toast }) {
             💡 Upload Tips
           </h4>
           <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-            <li>• PDF files are processed and indexed automatically</li>
+            <li>• PDFs, PNGs, and JPGs are processed and indexed automatically</li>
             <li>• Larger files may take longer to process</li>
             <li>• You can upload multiple files at once</li>
             <li>• Files are stored securely and can be organized into notebooks</li>
+            <li>• You can also add links (web pages or YouTube); we’ll extract readable text/transcripts</li>
           </ul>
         </CardContent>
       </Card>

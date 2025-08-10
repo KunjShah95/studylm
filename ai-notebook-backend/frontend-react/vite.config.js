@@ -14,6 +14,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/upload': 'http://127.0.0.1:8000',
+  '/upload_image': 'http://127.0.0.1:8000',
       '/ask': 'http://127.0.0.1:8000',
       '/save_note': 'http://127.0.0.1:8000',
       '/notes': 'http://127.0.0.1:8000',
@@ -23,7 +24,8 @@ export default defineConfig({
       '/files': 'http://127.0.0.1:8000',
       '/files-meta': 'http://127.0.0.1:8000',
       '/file': 'http://127.0.0.1:8000',
-      '/notebooks': 'http://127.0.0.1:8000',
+  '/notebooks': 'http://127.0.0.1:8000',
+  '/ingest_url': 'http://127.0.0.1:8000',
       '/health': 'http://127.0.0.1:8000'
     }
   }

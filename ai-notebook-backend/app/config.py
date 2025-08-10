@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 
 
 class Settings:
-    def __init__(self):
+    def __init__(self) -> None:
+        # Base and .env
         self.BASE_DIR = Path(__file__).resolve().parent.parent
         load_dotenv(dotenv_path=self.BASE_DIR / ".env")
 
@@ -35,9 +36,16 @@ class Settings:
         # Models
         self.EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
         self.CHAT_MODEL = os.getenv("CHAT_MODEL", "gpt-4o-mini")
-        # Comma-separated allow-list of chat models to display in the UI
         allowed = os.getenv("CHAT_MODELS_ALLOWED", "gpt-4o-mini,gpt-4o,gpt-4.1-mini,gpt-4.1")
         self.CHAT_MODELS_ALLOWED = [m.strip() for m in allowed.split(",") if m.strip()]
+
+        # OCR settings (for scanned/image PDFs)
+        ocr_en = os.getenv("OCR_ENABLED", "1").strip().lower()
+        self.OCR_ENABLED = ocr_en in {"1", "true", "yes", "on"}
+        self.OCR_DPI = int(os.getenv("OCR_DPI", "200"))  # render DPI for OCR
+        self.OCR_LANGUAGE = os.getenv("OCR_LANGUAGE", "eng")
+        # Additional custom tesseract CLI flags; leave blank for defaults
+        self.OCR_TESSERACT_CONFIG = os.getenv("OCR_TESSERACT_CONFIG", "") or None
 
 
 settings = Settings()

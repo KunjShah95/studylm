@@ -9,6 +9,10 @@ StudyLM is a lightweight NotebookLM-style RAG app. Upload PDFs, organize sources
 - React (Vite) frontend in `frontend-react/` for the UI (upload, status, chat with citations, notes, notebooks, study tools). If built, backend serves it at `/app`.
 - Optional Streamlit UI in `streamlit_app/`.
 
+### Features
+- Upload PDFs and ask questions with citations
+- Upload images (PNG/JPG) — OCR extracts text and indexes it
+- Ingest links (web pages or YouTube). We fetch readable text or transcripts and index them
 ## Requirements
 
 - Python 3.11+

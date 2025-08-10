@@ -86,7 +86,7 @@ export default function Notes({ base = '' }) {
         </select>
         <button onClick={loadNotes} disabled={!fileId} className="btn btn-secondary">Load</button>
         {fileId && (
-          <a href={`/uploads/${fileId}.pdf`} target="_blank" rel="noreferrer" className="ml-auto text-sm text-sky-600 dark:text-sky-400">Open PDF ↗</a>
+          <a href={`${base}/uploads/${fileId}.pdf`} target="_blank" rel="noreferrer" className="ml-auto text-sm text-sky-600 dark:text-sky-400">Open PDF ↗</a>
         )}
       </div>
 
