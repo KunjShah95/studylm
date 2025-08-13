@@ -6,6 +6,7 @@ const items = [
   { key: 'files', label: 'Files' },
   { key: 'chat', label: 'Chat' },
   { key: 'notes', label: 'Notes' },
+  { key: 'imageqa', label: 'Image Q&A' },
 ]
 
 export default function SideNav({ current, onSelect, open }) {

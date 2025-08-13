@@ -128,7 +128,7 @@ export default function Chat({ base = '' }) {
       ask()
     }
   }
-
+R
   return (
     <div className="container-custom py-8 max-w-2xl mx-auto">
       <div className="card card-hover p-6 mb-8">

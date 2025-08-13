@@ -6,6 +6,7 @@ import Upload from './pages/Upload.jsx'
 import Files from './pages/Files.jsx'
 import Chat from './pages/Chat.jsx'
 import Notes from './pages/Notes.jsx'
+import ImageQA from './pages/ImageQA.jsx'
 
 // API base: allow override via VITE_API_BASE for static hosting (e.g., Vercel)
 const envBase = (import.meta.env.VITE_API_BASE || '').toString().trim()
@@ -28,7 +29,7 @@ export default function App() {
     root.classList.add(isDark ? 'dark' : 'light')
   }, [theme])
 
-  const titleMap = { home: 'Home', upload: 'Upload', files: 'Files', chat: 'Chat', notes: 'Notes' }
+  const titleMap = { home: 'Home', upload: 'Upload', files: 'Files', chat: 'Chat', notes: 'Notes', imageqa: 'Image Q&A' }
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }}>
@@ -41,6 +42,7 @@ export default function App() {
           {page === 'files' && <Files base={BASE} />}
           {page === 'chat' && <Chat base={BASE} />}
           {page === 'notes' && <Notes base={BASE} />}
+          {page === 'imageqa' && <ImageQA base={BASE} />}
         </main>
       </div>
     </div>

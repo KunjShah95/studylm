@@ -445,3 +445,35 @@ html {
     display: block;
   }
 }
+
+/* Custom animation for slow bounce (feature icons) */
+.animate-bounce-slow {
+  animation: bounce-slow 2.2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8,0,1,1);
+  }
+  50% {
+    transform: translateY(-18px);
+    animation-timing-function: cubic-bezier(0,0,0.2,1);
+  }
+}
+
+/* Animated gradient movement for background overlay */
+.animate-gradient-move {
+  background-size: 200% 200%;
+  animation: gradient-move 8s ease-in-out infinite;
+}
+@keyframes gradient-move {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
