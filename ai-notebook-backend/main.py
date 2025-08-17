@@ -1,224 +1,32 @@
-# --- MULTIMODAL Q&A ENDPOINT ---
-@app.post("/multimodal-qa")
-async def multimodal_qa(
-    text: str = Body("", embed=True),
-    image_ocr: str = Body("", embed=True),
-    tables: list = Body([], embed=True),
-    question: str = Body(..., embed=True),
-    chat_model: Optional[str] = Body(None),
-):
-    """Answer a question using any combination of text, image OCR, and table data."""
-    context = []
-    if text.strip():
-        context.append(f"Text:\n{text.strip()}")
-    if image_ocr.strip():
-        context.append(f"Image OCR:\n{image_ocr.strip()}")
-    if tables:
-        for i, t in enumerate(tables):
-            context.append(f"Table {i+1}:\n{t}")
-    if not context:
-        raise HTTPException(status_code=400, detail="No context provided.")
-    user_msg = (
-        f"Here is some context from various sources.\n\n{chr(10).join(context)}\n\nQ: {question}\nA:"
-    )
-    full_prompt = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_msg},
-    ]
-    from openai import OpenAI
-    if not settings.OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Server missing OPENAI_API_KEY")
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    try:
-        resp = client.chat.completions.create(
-            model=(chat_model or settings.CHAT_MODEL),
-            messages=full_prompt,
-            temperature=0.2,
-            max_tokens=512,
-        )
-        answer = resp.choices[0].message.content.strip()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
-    return {"answer": answer}
-# --- SUMMARIZATION ENDPOINT ---
-from fastapi import Body
-@app.post("/summarize")
-async def summarize(
-    content: str = Body(..., embed=True),
-    chat_model: Optional[str] = Body(None),
-):
-    """Summarize any text, OCR, or transcript content using the LLM."""
-    if not content.strip():
-        raise HTTPException(status_code=400, detail="No content to summarize.")
-    user_msg = (
-        f"Summarize the following content in a concise, clear way for a student.\n\n{content}\n\nSummary:"
-    )
-    full_prompt = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_msg},
-    ]
-    from openai import OpenAI
-    if not settings.OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Server missing OPENAI_API_KEY")
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    try:
-        resp = client.chat.completions.create(
-            model=(chat_model or settings.CHAT_MODEL),
-            messages=full_prompt,
-            temperature=0.2,
-            max_tokens=512,
-        )
-        summary = resp.choices[0].message.content.strip()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
-    return {"summary": summary}
-from fastapi import Form
-# --- IMAGE Q&A ENDPOINT ---
-from typing import Optional
-@app.post("/ask-image")
-async def ask_image(
-    file: UploadFile = File(...),
-    question: str = Form(...),
-    chat_model: Optional[str] = Form(None),
-):
-    """Accept an image, extract text with OCR, and answer a question about it."""
-    # Save uploaded image to memory
-    contents = await file.read()
-    from PIL import Image
-    import io
-    img = Image.open(io.BytesIO(contents))
-    # OCR
-    import pytesseract
-    lang = getattr(settings, "OCR_LANGUAGE", "eng")
-    cfg = getattr(settings, "OCR_TESSERACT_CONFIG", None)
-    text = pytesseract.image_to_string(img, lang=lang, config=cfg)
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="No text found in image.")
-    # Use LLM to answer question about extracted text
-    user_msg = (
-        f"Here is some text extracted from an image via OCR:\n\n{text}\n\nQ: {question}\nA:"
-    )
-    full_prompt = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_msg},
-    ]
-    from openai import OpenAI
-    if not settings.OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Server missing OPENAI_API_KEY")
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    try:
-        resp = client.chat.completions.create(
-            model=(chat_model or settings.CHAT_MODEL),
-            messages=full_prompt,
-            temperature=0.2,
-            max_tokens=512,
-        )
-        answer = resp.choices[0].message.content.strip()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
-    return {"answer": answer, "ocr_text": text}
 
 
-# --- TABLE EXTRACTION (PDF or Image) ---
-from fastapi import Form
-@app.post("/extract-table")
-async def extract_table(
-    file: UploadFile = File(...),
-    filetype: str = Form(...),  # 'pdf' or 'image'
-    page: int = Form(1),        # for PDF, which page
-):
-    """Extract tables from a PDF (using camelot) or image (using pytesseract)."""
-    import io
-    import pandas as pd
-    tables = []
-    if filetype == 'pdf':
-        # Save PDF to temp
-        contents = await file.read()
-        with open("/tmp/_table.pdf", "wb") as f:
-            f.write(contents)
-        try:
-            import camelot
-            pdf_tables = camelot.read_pdf("/tmp/_table.pdf", pages=str(page), flavor="stream")
-            for t in pdf_tables:
-                tables.append(t.df.to_dict())
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"PDF table extraction failed: {e}")
-    elif filetype == 'image':
-        # Use pytesseract to extract tables from image
-        from PIL import Image
-        import pytesseract
-        img = Image.open(io.BytesIO(await file.read()))
-        try:
-            df = pd.read_html(pytesseract.image_to_string(img))[0]
-            tables.append(df.to_dict())
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Image table extraction failed: {e}")
-    else:
-        raise HTTPException(status_code=400, detail="filetype must be 'pdf' or 'image'")
-    return {"tables": tables}
-
-
-# --- AUDIO TRANSCRIPTION & Q&A ---
-@app.post("/transcribe-audio")
-async def transcribe_audio(
-    file: UploadFile = File(...),
-    question: str = Form(None),
-    chat_model: Optional[str] = Form(None),
-):
-    """Transcribe audio (mp3/wav/m4a) and optionally answer a question about it."""
-    import io
-    contents = await file.read()
-    from openai import OpenAI
-    if not settings.OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Server missing OPENAI_API_KEY")
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    # Transcribe audio using Whisper
-    try:
-        audio_file = io.BytesIO(contents)
-        audio_file.name = file.filename
-        transcript = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            response_format="text"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Transcription error: {e}")
-    transcript_text = transcript.strip()
-    if not question:
-        return {"transcript": transcript_text}
-    # Q&A about transcript
-    user_msg = (
-        f"Here is a transcript from an audio file:\n\n{transcript_text}\n\nQ: {question}\nA:"
-    )
-    full_prompt = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_msg},
-    ]
-    try:
-        resp = client.chat.completions.create(
-            model=(chat_model or settings.CHAT_MODEL),
-            messages=full_prompt,
-            temperature=0.2,
-            max_tokens=512,
-        )
-        answer = resp.choices[0].message.content.strip()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
-    return {"transcript": transcript_text, "answer": answer}
+# -------------------
+# IMPORTS
+# -------------------
 import json
 import uuid
+import re
+import io
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Header
+from typing import List, Optional
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Header, Body, Form
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import RedirectResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
 from app.pdf_parser import extract_text, chunk_text
-from pathlib import Path
-import io
-import re
+from app.embeddings import embed_texts
+from app.vector_store import build_index, save_index, load_index, search
+from app.db import (
+    load_notes,
+    save_notes,
+    load_notebooks,
+    save_notebooks,
+    load_files_meta,
+    save_files_meta,
+)
+from app.config import settings
 import requests
 from bs4 import BeautifulSoup
 try:
@@ -232,26 +40,16 @@ try:
     _OCR_AVAILABLE = True
 except Exception:
     _OCR_AVAILABLE = False
- 
-from app.embeddings import embed_texts
-from app.vector_store import build_index, save_index, load_index, search
-from app.db import (
-    load_notes,
-    save_notes,
-    load_notebooks,
-    save_notebooks,
-    load_files_meta,
-    save_files_meta,
-)
-from app.config import settings
 
+# -------------------
+# APP SETUP
+# -------------------
 app = FastAPI(
     title="StudyLM Backend (MVP)",
     docs_url=("/docs" if settings.ENABLE_API_DOCS else None),
     redoc_url=("/redoc" if settings.ENABLE_API_DOCS else None),
     openapi_url=("/openapi.json" if settings.ENABLE_API_DOCS else None),
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=(settings.CORS_ORIGINS or ["*"]),
@@ -259,8 +57,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 class ApiPrefixMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.scope.get("path", "")
@@ -270,9 +66,11 @@ class ApiPrefixMiddleware(BaseHTTPMiddleware):
             if isinstance(raw, (bytes, bytearray)) and raw.startswith(b"/api/"):
                 request.scope["raw_path"] = raw[4:]
         return await call_next(request)
-
-
 app.add_middleware(ApiPrefixMiddleware)
+
+# -------------------
+# REMAINDER OF FILE (ROUTES, HELPERS, ETC.)
+# -------------------
 
 @app.get("/models")
 def list_models():
